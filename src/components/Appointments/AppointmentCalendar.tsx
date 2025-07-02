@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Calendar, ChevronLeft, ChevronRight, Plus, Edit, Trash2, Clock, User, Car, List, Grid } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Plus, Edit, Trash2, Clock, User, Car, List, Grid, AlertTriangle } from 'lucide-react';
 import { useAppointments } from '../../hooks/useAppointments';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
-import { formatDateTime, getStatusColor, getStatusLabel } from '../../utils/scheduling';
+import { formatDateTime, getStatusColor, getStatusLabel, formatDuration } from '../../utils/scheduling';
 import { mockClients, mockVehicles, mockServices } from '../../data/mockData';
 import { AppointmentForm } from './AppointmentForm';
 import { Appointment } from '../../types';
@@ -105,6 +105,20 @@ export function AppointmentCalendar() {
     const vehicle = vehicles.find(v => v.id === appointment.vehicleId);
     const appointmentServices = services.filter(s => appointment.serviceIds.includes(s.id));
     return { client, vehicle, services: appointmentServices };
+  };
+
+  const getAppointmentDuration = (appointment: Appointment) => {
+    const start = new Date(appointment.startDateTime);
+    const end = new Date(appointment.endDateTime);
+    const workDuration = Math.round((end.getTime() - start.getTime()) / (1000 * 60));
+    
+    let dryingDuration = 0;
+    if (appointment.dryingEndDateTime) {
+      const dryingEnd = new Date(appointment.dryingEndDateTime);
+      dryingDuration = Math.round((dryingEnd.getTime() - end.getTime()) / (1000 * 60));
+    }
+    
+    return { workDuration, dryingDuration };
   };
 
   const days = getDaysInMonth(currentMonth);
@@ -233,6 +247,7 @@ export function AppointmentCalendar() {
                 const { client, vehicle, services: appointmentServices } = getAppointmentDetails(appointment);
                 const startTime = new Date(appointment.startDateTime);
                 const endTime = new Date(appointment.endDateTime);
+                const { workDuration, dryingDuration } = getAppointmentDuration(appointment);
                 
                 return (
                   <div
@@ -275,6 +290,7 @@ export function AppointmentCalendar() {
                         <span>
                           {startTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - 
                           {endTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          <span className="text-gray-500 ml-1">({formatDuration(workDuration)})</span>
                         </span>
                       </div>
                       
@@ -283,6 +299,18 @@ export function AppointmentCalendar() {
                         <span>{vehicle?.brand} {vehicle?.model} - {vehicle?.plate}</span>
                       </div>
                     </div>
+
+                    {dryingDuration > 0 && (
+                      <div className="flex items-center space-x-2 text-sm text-orange-600 mb-3">
+                        <AlertTriangle className="w-4 h-4" />
+                        <span>
+                          Secagem até {new Date(appointment.dryingEndDateTime!).toLocaleTimeString('pt-BR', { 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })} ({formatDuration(dryingDuration)})
+                        </span>
+                      </div>
+                    )}
                     
                     <div className="border-t pt-3">
                       <div className="flex items-center justify-between">
@@ -346,6 +374,7 @@ export function AppointmentCalendar() {
               const isToday = appointmentDate.toDateString() === new Date().toDateString();
               const isPast = appointmentDate < new Date();
               const isTomorrow = appointmentDate.toDateString() === new Date(Date.now() + 86400000).toDateString();
+              const { workDuration, dryingDuration } = getAppointmentDuration(appointment);
               
               return (
                 <div
@@ -415,6 +444,7 @@ export function AppointmentCalendar() {
                       <span>
                         {appointmentDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - 
                         {new Date(appointment.endDateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        <span className="text-gray-500 ml-1">({formatDuration(workDuration)})</span>
                       </span>
                     </div>
                     
@@ -423,6 +453,18 @@ export function AppointmentCalendar() {
                       <span>{vehicle?.brand} {vehicle?.model} - {vehicle?.plate}</span>
                     </div>
                   </div>
+
+                  {dryingDuration > 0 && (
+                    <div className="flex items-center space-x-2 text-sm text-orange-600 mb-3">
+                      <AlertTriangle className="w-4 h-4" />
+                      <span>
+                        Secagem até {new Date(appointment.dryingEndDateTime!).toLocaleTimeString('pt-BR', { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })} ({formatDuration(dryingDuration)})
+                      </span>
+                    </div>
+                  )}
                   
                   <div className="border-t pt-3">
                     <div className="flex items-center justify-between">
@@ -504,6 +546,7 @@ export function AppointmentCalendar() {
           clients={clients}
           vehicles={vehicles}
           services={services}
+          appointments={appointments}
           onSave={handleSave}
           onCancel={() => {
             setShowForm(false);

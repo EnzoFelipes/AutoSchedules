@@ -60,6 +60,7 @@ export interface Appointment {
   serviceIds: string[];
   startDateTime: string;
   endDateTime: string;
+  dryingEndDateTime?: string; // Para serviços com tempo de secagem
   status: AppointmentStatus;
   observations?: string;
   responsible?: string;
@@ -74,6 +75,23 @@ export interface TimeSlot {
   end: string;
   available: boolean;
   duration: number; // in minutes
+  reason?: string; // Motivo da indisponibilidade
+}
+
+export interface WorkingHours {
+  start: string; // "08:00"
+  end: string;   // "18:00"
+  lunchStart?: string; // "12:00"
+  lunchEnd?: string;   // "13:00"
+}
+
+export interface AvailabilitySlot {
+  date: string;
+  startTime: string;
+  endTime: string;
+  availableDuration: number; // em minutos
+  canStartService: boolean;
+  nextAvailableSlot?: string;
 }
 
 export interface DashboardMetrics {
@@ -82,4 +100,11 @@ export interface DashboardMetrics {
   monthlyGrowth: number;
   utilization: number;
   nextAppointments: Appointment[];
+}
+
+export interface BusinessSettings {
+  workingHours: WorkingHours;
+  workingDays: number[]; // 0-6 (domingo a sábado)
+  maxConcurrentServices: number;
+  advanceBookingDays: number;
 }
