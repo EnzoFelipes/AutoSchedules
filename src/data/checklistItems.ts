@@ -1,0 +1,310 @@
+import { ChecklistItem, VehicleType, ServiceCategory } from '../types';
+
+export const defaultChecklistItems: ChecklistItem[] = [
+  // ENTRADA - Documentação
+  {
+    id: 'entry-doc-01',
+    category: 'entry',
+    type: 'documentation',
+    label: 'Documentos do Veículo',
+    description: 'Verificar se cliente trouxe documentos necessários',
+    required: true,
+  },
+  {
+    id: 'entry-doc-02',
+    category: 'entry',
+    type: 'documentation',
+    label: 'Chaves do Veículo',
+    description: 'Receber e conferir todas as chaves',
+    required: true,
+  },
+  {
+    id: 'entry-doc-03',
+    category: 'entry',
+    type: 'documentation',
+    label: 'Itens Pessoais',
+    description: 'Verificar se há itens pessoais no veículo',
+    required: true,
+  },
+
+  // ENTRADA - Visual Externo
+  {
+    id: 'entry-visual-01',
+    category: 'entry',
+    type: 'visual',
+    label: 'Riscos e Arranhões',
+    description: 'Documentar riscos e arranhões existentes na pintura',
+    required: true,
+  },
+  {
+    id: 'entry-visual-02',
+    category: 'entry',
+    type: 'visual',
+    label: 'Amassados',
+    description: 'Verificar e documentar amassados na lataria',
+    required: true,
+  },
+  {
+    id: 'entry-visual-03',
+    category: 'entry',
+    type: 'visual',
+    label: 'Estado dos Pneus',
+    description: 'Verificar condição e calibragem dos pneus',
+    required: false,
+  },
+  {
+    id: 'entry-visual-04',
+    category: 'entry',
+    type: 'visual',
+    label: 'Faróis e Lanternas',
+    description: 'Verificar funcionamento de faróis e lanternas',
+    required: false,
+  },
+  {
+    id: 'entry-visual-05',
+    category: 'entry',
+    type: 'visual',
+    label: 'Vidros e Espelhos',
+    description: 'Verificar integridade de vidros e espelhos',
+    required: true,
+  },
+
+  // ENTRADA - Visual Interno
+  {
+    id: 'entry-internal-01',
+    category: 'entry',
+    type: 'visual',
+    label: 'Estado dos Bancos',
+    description: 'Verificar condição do estofamento',
+    required: true,
+  },
+  {
+    id: 'entry-internal-02',
+    category: 'entry',
+    type: 'visual',
+    label: 'Painel e Instrumentos',
+    description: 'Verificar funcionamento do painel',
+    required: false,
+  },
+  {
+    id: 'entry-internal-03',
+    category: 'entry',
+    type: 'visual',
+    label: 'Tapetes e Forração',
+    description: 'Verificar estado dos tapetes e forração',
+    required: true,
+  },
+
+  // ENTRADA - Funcional
+  {
+    id: 'entry-func-01',
+    category: 'entry',
+    type: 'functional',
+    label: 'Nível de Combustível',
+    description: 'Registrar nível atual de combustível',
+    required: true,
+  },
+  {
+    id: 'entry-func-02',
+    category: 'entry',
+    type: 'functional',
+    label: 'Quilometragem',
+    description: 'Registrar quilometragem atual',
+    required: true,
+  },
+  {
+    id: 'entry-func-03',
+    category: 'entry',
+    type: 'functional',
+    label: 'Ar Condicionado',
+    description: 'Testar funcionamento do ar condicionado',
+    required: false,
+    vehicleTypes: ['car', 'suv', 'van'],
+  },
+  {
+    id: 'entry-func-04',
+    category: 'entry',
+    type: 'functional',
+    label: 'Sistema Elétrico',
+    description: 'Verificar funcionamento básico do sistema elétrico',
+    required: false,
+  },
+
+  // ENTRADA - Segurança
+  {
+    id: 'entry-safety-01',
+    category: 'entry',
+    type: 'safety',
+    label: 'Freios',
+    description: 'Teste básico do sistema de freios',
+    required: false,
+  },
+  {
+    id: 'entry-safety-02',
+    category: 'entry',
+    type: 'safety',
+    label: 'Direção',
+    description: 'Verificar funcionamento da direção',
+    required: false,
+  },
+
+  // ENTRADA - Específicos para Pintura
+  {
+    id: 'entry-paint-01',
+    category: 'entry',
+    type: 'visual',
+    label: 'Mapeamento de Defeitos',
+    description: 'Mapear detalhadamente áreas que precisam de reparo',
+    required: true,
+    serviceCategories: ['painting', 'repair'],
+  },
+  {
+    id: 'entry-paint-02',
+    category: 'entry',
+    type: 'visual',
+    label: 'Teste de Aderência',
+    description: 'Verificar aderência da tinta existente',
+    required: true,
+    serviceCategories: ['painting'],
+  },
+
+  // SAÍDA - Limpeza e Qualidade
+  {
+    id: 'exit-clean-01',
+    category: 'exit',
+    type: 'cleaning',
+    label: 'Limpeza Externa',
+    description: 'Verificar qualidade da limpeza externa',
+    required: true,
+    serviceCategories: ['cleaning', 'detailing'],
+  },
+  {
+    id: 'exit-clean-02',
+    category: 'exit',
+    type: 'cleaning',
+    label: 'Limpeza Interna',
+    description: 'Verificar qualidade da limpeza interna',
+    required: true,
+    serviceCategories: ['cleaning', 'detailing'],
+  },
+  {
+    id: 'exit-clean-03',
+    category: 'exit',
+    type: 'cleaning',
+    label: 'Vidros e Espelhos',
+    description: 'Verificar limpeza de vidros e espelhos',
+    required: true,
+    serviceCategories: ['cleaning', 'detailing'],
+  },
+
+  // SAÍDA - Pintura
+  {
+    id: 'exit-paint-01',
+    category: 'exit',
+    type: 'visual',
+    label: 'Qualidade da Pintura',
+    description: 'Verificar uniformidade e qualidade da pintura',
+    required: true,
+    serviceCategories: ['painting'],
+  },
+  {
+    id: 'exit-paint-02',
+    category: 'exit',
+    type: 'visual',
+    label: 'Acabamento',
+    description: 'Verificar qualidade do acabamento',
+    required: true,
+    serviceCategories: ['painting', 'repair'],
+  },
+  {
+    id: 'exit-paint-03',
+    category: 'exit',
+    type: 'functional',
+    label: 'Secagem Completa',
+    description: 'Confirmar que a tinta está completamente seca',
+    required: true,
+    serviceCategories: ['painting'],
+  },
+
+  // SAÍDA - Proteção
+  {
+    id: 'exit-protect-01',
+    category: 'exit',
+    type: 'visual',
+    label: 'Aplicação de Cera',
+    description: 'Verificar uniformidade da aplicação de cera',
+    required: true,
+    serviceCategories: ['protection'],
+  },
+  {
+    id: 'exit-protect-02',
+    category: 'exit',
+    type: 'visual',
+    label: 'Brilho e Proteção',
+    description: 'Verificar brilho e nível de proteção aplicado',
+    required: true,
+    serviceCategories: ['protection'],
+  },
+
+  // SAÍDA - Funcional Geral
+  {
+    id: 'exit-func-01',
+    category: 'exit',
+    type: 'functional',
+    label: 'Teste de Funcionamento',
+    description: 'Testar funcionamento geral do veículo',
+    required: true,
+  },
+  {
+    id: 'exit-func-02',
+    category: 'exit',
+    type: 'functional',
+    label: 'Limpeza de Ferramentas',
+    description: 'Verificar se não há ferramentas esquecidas no veículo',
+    required: true,
+  },
+
+  // SAÍDA - Documentação
+  {
+    id: 'exit-doc-01',
+    category: 'exit',
+    type: 'documentation',
+    label: 'Devolução de Chaves',
+    description: 'Devolver todas as chaves ao cliente',
+    required: true,
+  },
+  {
+    id: 'exit-doc-02',
+    category: 'exit',
+    type: 'documentation',
+    label: 'Devolução de Documentos',
+    description: 'Devolver documentos ao cliente',
+    required: true,
+  },
+  {
+    id: 'exit-doc-03',
+    category: 'exit',
+    type: 'documentation',
+    label: 'Orientações de Cuidado',
+    description: 'Orientar cliente sobre cuidados pós-serviço',
+    required: false,
+  },
+
+  // SAÍDA - Satisfação
+  {
+    id: 'exit-satisfaction-01',
+    category: 'exit',
+    type: 'documentation',
+    label: 'Aprovação do Cliente',
+    description: 'Obter aprovação final do cliente',
+    required: true,
+  },
+  {
+    id: 'exit-satisfaction-02',
+    category: 'exit',
+    type: 'documentation',
+    label: 'Feedback do Serviço',
+    description: 'Coletar feedback sobre o serviço prestado',
+    required: false,
+  },
+];

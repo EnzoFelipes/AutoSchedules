@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Calendar, ChevronLeft, ChevronRight, Plus, Edit, Trash2, Clock, User, Car, List, Grid, AlertTriangle } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Plus, Edit, Trash2, Clock, User, Car, List, Grid, AlertTriangle, Eye } from 'lucide-react';
 import { useAppointments } from '../../hooks/useAppointments';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
 import { formatDateTime, getStatusColor, getStatusLabel, formatDuration } from '../../utils/scheduling';
 import { mockClients, mockVehicles, mockServices } from '../../data/mockData';
 import { AppointmentForm } from './AppointmentForm';
+import { AppointmentDetails } from './AppointmentDetails';
 import { Appointment } from '../../types';
 
 export function AppointmentCalendar() {
@@ -19,6 +20,8 @@ export function AppointmentCalendar() {
   const [showForm, setShowForm] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
+  const [showDetails, setShowDetails] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
 
   const appointmentsForDate = getAppointmentsByDate(selectedDate);
   const allAppointments = appointments.filter((apt: Appointment) => apt.status !== 'cancelled');
@@ -51,6 +54,11 @@ export function AppointmentCalendar() {
     if (confirm('Tem certeza que deseja excluir este agendamento?')) {
       setAppointments((prev: Appointment[]) => prev.filter(a => a.id !== appointmentId));
     }
+  };
+
+  const handleViewDetails = (appointment: Appointment) => {
+    setSelectedAppointment(appointment);
+    setShowDetails(true);
   };
 
   const getDaysInMonth = (date: Date) => {
@@ -270,6 +278,13 @@ export function AppointmentCalendar() {
                           {getStatusLabel(appointment.status)}
                         </span>
                         <button
+                          onClick={() => handleViewDetails(appointment)}
+                          className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                          title="Ver detalhes"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => handleEdit(appointment)}
                           className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                         >
@@ -419,6 +434,13 @@ export function AppointmentCalendar() {
                         {getStatusLabel(appointment.status)}
                       </span>
                       <button
+                        onClick={() => handleViewDetails(appointment)}
+                        className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                        title="Ver detalhes"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
                         onClick={() => handleEdit(appointment)}
                         className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                       >
@@ -551,6 +573,25 @@ export function AppointmentCalendar() {
           onCancel={() => {
             setShowForm(false);
             setEditingAppointment(null);
+          }}
+        />
+      )}
+
+      {/* Appointment Details Modal */}
+      {showDetails && selectedAppointment && (
+        <AppointmentDetails
+          appointment={selectedAppointment}
+          client={clients.find(c => c.id === selectedAppointment.clientId)!}
+          vehicle={vehicles.find(v => v.id === selectedAppointment.vehicleId)!}
+          services={services.filter(s => selectedAppointment.serviceIds.includes(s.id))}
+          onClose={() => {
+            setShowDetails(false);
+            setSelectedAppointment(null);
+          }}
+          onEdit={() => {
+            setEditingAppointment(selectedAppointment);
+            setShowDetails(false);
+            setShowForm(true);
           }}
         />
       )}

@@ -34,6 +34,39 @@ export interface ServiceConfiguration {
   price: number;
 }
 
+export interface ChecklistItem {
+  id: string;
+  category: ChecklistCategory;
+  type: ChecklistType;
+  label: string;
+  description?: string;
+  required: boolean;
+  vehicleTypes?: VehicleType[];
+  serviceCategories?: ServiceCategory[];
+}
+
+export type ChecklistCategory = 'entry' | 'exit';
+export type ChecklistType = 'visual' | 'functional' | 'documentation' | 'cleaning' | 'safety';
+
+export interface ChecklistResponse {
+  itemId: string;
+  checked: boolean;
+  observations?: string;
+  photos?: string[];
+  timestamp: string;
+  responsiblePerson: string;
+}
+
+export interface AppointmentChecklist {
+  appointmentId: string;
+  entryChecklist: ChecklistResponse[];
+  exitChecklist: ChecklistResponse[];
+  entryCompletedAt?: string;
+  exitCompletedAt?: string;
+  entryResponsible?: string;
+  exitResponsible?: string;
+}
+
 export interface Service {
   id: string;
   name: string;
@@ -43,6 +76,7 @@ export interface Service {
   dryingTime?: number; // in minutes
   requiresEntryChecklist: boolean;
   requiresExitChecklist: boolean;
+  customChecklistItems?: string[]; // IDs de itens específicos do serviço
   configurations: {
     small: ServiceConfiguration;
     medium: ServiceConfiguration;
