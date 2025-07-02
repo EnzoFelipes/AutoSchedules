@@ -1,0 +1,85 @@
+export interface Client {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  cpf: string;
+  address?: string;
+  birthDate?: string;
+  observations?: string;
+  createdAt: string;
+}
+
+export interface Vehicle {
+  id: string;
+  clientId: string;
+  plate: string;
+  brand: string;
+  model: string;
+  year: number;
+  color: string;
+  type: VehicleType;
+  size: VehicleSize;
+  photos?: string[];
+  createdAt: string;
+}
+
+export type VehicleType = 'car' | 'motorcycle' | 'truck' | 'van' | 'suv';
+export type VehicleSize = 'small' | 'medium' | 'large' | 'extra-large';
+
+export interface ServiceConfiguration {
+  available: boolean;
+  durationHours: number;
+  durationMinutes: number;
+  price: number;
+}
+
+export interface Service {
+  id: string;
+  name: string;
+  description: string;
+  vehicleType: VehicleType;
+  category: ServiceCategory;
+  dryingTime?: number; // in minutes
+  requiresEntryChecklist: boolean;
+  requiresExitChecklist: boolean;
+  configurations: {
+    small: ServiceConfiguration;
+    medium: ServiceConfiguration;
+    large: ServiceConfiguration;
+    'extra-large': ServiceConfiguration;
+  };
+}
+
+export type ServiceCategory = 'cleaning' | 'detailing' | 'painting' | 'protection' | 'repair';
+
+export interface Appointment {
+  id: string;
+  clientId: string;
+  vehicleId: string;
+  serviceIds: string[];
+  startDateTime: string;
+  endDateTime: string;
+  status: AppointmentStatus;
+  observations?: string;
+  responsible?: string;
+  totalPrice: number;
+  createdAt: string;
+}
+
+export type AppointmentStatus = 'scheduled' | 'in-progress' | 'completed' | 'cancelled';
+
+export interface TimeSlot {
+  start: string;
+  end: string;
+  available: boolean;
+  duration: number; // in minutes
+}
+
+export interface DashboardMetrics {
+  todayAppointments: number;
+  weekRevenue: number;
+  monthlyGrowth: number;
+  utilization: number;
+  nextAppointments: Appointment[];
+}
