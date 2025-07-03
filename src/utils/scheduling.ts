@@ -130,6 +130,7 @@ export function calculateServiceDuration(serviceIds: string[], vehicleSize: stri
 
 /**
  * Calcula quando o trabalho ativo terminará, considerando horários de funcionamento
+ * CORRIGIDO: Para serviços simples que cabem no mesmo dia
  */
 export function calculateWorkEndTime(
   startDateTime: Date,
@@ -137,59 +138,89 @@ export function calculateWorkEndTime(
   settings: BusinessSettings = DEFAULT_BUSINESS_SETTINGS
 ): Date {
   let remainingWork = workDurationMinutes;
-  let currentDate = new Date(startDateTime);
+  let currentTime = new Date(startDateTime);
+  
+  // Para debug
+  console.log(`🔧 Calculando fim do trabalho:`);
+  console.log(`   Início: ${currentTime.toLocaleString('pt-BR')}`);
+  console.log(`   Duração: ${workDurationMinutes} minutos (${Math.floor(workDurationMinutes/60)}h ${workDurationMinutes%60}min)`);
   
   while (remainingWork > 0) {
-    const workingPeriods = getWorkingPeriods(currentDate, settings);
+    const workingPeriods = getWorkingPeriods(currentTime, settings);
+    console.log(`   Verificando dia: ${currentTime.toLocaleDateString('pt-BR')}`);
+    console.log(`   Períodos de trabalho: ${workingPeriods.length}`);
+    
+    let workedInThisDay = false;
     
     for (const period of workingPeriods) {
       if (remainingWork <= 0) break;
       
-      // Se o trabalho começou neste período
-      if (currentDate >= period.start && currentDate < period.end) {
-        const availableMinutesInPeriod = Math.floor((period.end.getTime() - currentDate.getTime()) / (1000 * 60));
-        const workInThisPeriod = Math.min(remainingWork, availableMinutesInPeriod);
-        
-        if (workInThisPeriod >= remainingWork) {
-          // Trabalho termina neste período
-          return new Date(currentDate.getTime() + remainingWork * 60000);
-        } else {
-          // Trabalho continua no próximo período
-          remainingWork -= workInThisPeriod;
-          currentDate = new Date(period.end);
-        }
+      console.log(`   Período: ${period.start.toLocaleTimeString('pt-BR')} - ${period.end.toLocaleTimeString('pt-BR')}`);
+      
+      // Determinar quando começar a trabalhar neste período
+      let workStartTime: Date;
+      
+      if (currentTime >= period.start && currentTime < period.end) {
+        // Trabalho começa no horário atual (dentro do período)
+        workStartTime = new Date(currentTime);
+        console.log(`   Trabalho continua de onde parou: ${workStartTime.toLocaleTimeString('pt-BR')}`);
+      } else if (currentTime < period.start) {
+        // Trabalho começa no início do período
+        workStartTime = new Date(period.start);
+        console.log(`   Trabalho começa no início do período: ${workStartTime.toLocaleTimeString('pt-BR')}`);
+      } else {
+        // currentTime >= period.end - período já passou
+        console.log(`   Período já passou, pulando...`);
+        continue;
       }
-      // Se ainda não chegamos no período de trabalho
-      else if (currentDate < period.start) {
-        const availableMinutesInPeriod = Math.floor((period.end.getTime() - period.start.getTime()) / (1000 * 60));
-        const workInThisPeriod = Math.min(remainingWork, availableMinutesInPeriod);
-        
-        if (workInThisPeriod >= remainingWork) {
-          // Trabalho termina neste período
-          return new Date(period.start.getTime() + remainingWork * 60000);
-        } else {
-          // Trabalho continua no próximo período
-          remainingWork -= workInThisPeriod;
-          currentDate = new Date(period.end);
-        }
+      
+      // Calcular quanto tempo disponível neste período
+      const availableMinutesInPeriod = Math.floor((period.end.getTime() - workStartTime.getTime()) / (1000 * 60));
+      console.log(`   Tempo disponível no período: ${availableMinutesInPeriod} minutos`);
+      
+      if (availableMinutesInPeriod <= 0) {
+        console.log(`   Sem tempo disponível neste período`);
+        continue;
+      }
+      
+      const workInThisPeriod = Math.min(remainingWork, availableMinutesInPeriod);
+      console.log(`   Trabalho neste período: ${workInThisPeriod} minutos`);
+      
+      if (workInThisPeriod >= remainingWork) {
+        // Trabalho termina neste período
+        const endTime = new Date(workStartTime.getTime() + remainingWork * 60000);
+        console.log(`   ✅ Trabalho termina: ${endTime.toLocaleString('pt-BR')}`);
+        return endTime;
+      } else {
+        // Trabalho continua no próximo período
+        remainingWork -= workInThisPeriod;
+        currentTime = new Date(period.end);
+        workedInThisDay = true;
+        console.log(`   Trabalho restante: ${remainingWork} minutos`);
+        console.log(`   Próximo horário: ${currentTime.toLocaleString('pt-BR')}`);
       }
     }
     
-    // Se chegamos aqui, precisamos ir para o próximo dia útil
-    currentDate.setDate(currentDate.getDate() + 1);
-    currentDate.setHours(0, 0, 0, 0);
-    
-    // Encontrar o próximo dia útil
-    while (!isWorkingDay(currentDate, settings)) {
-      currentDate.setDate(currentDate.getDate() + 1);
+    // Se chegamos aqui e não trabalhamos neste dia, precisamos ir para o próximo dia útil
+    if (!workedInThisDay) {
+      console.log(`   Nenhum trabalho possível hoje, indo para próximo dia útil`);
+      currentTime.setDate(currentTime.getDate() + 1);
+      currentTime.setHours(0, 0, 0, 0);
+      
+      // Encontrar o próximo dia útil
+      while (!isWorkingDay(currentTime, settings)) {
+        currentTime.setDate(currentTime.getDate() + 1);
+      }
+      
+      // Definir para o início do expediente
+      const startTime = parseTime(settings.workingHours.start);
+      currentTime.setHours(startTime.hours, startTime.minutes, 0, 0);
+      console.log(`   Próximo dia útil: ${currentTime.toLocaleString('pt-BR')}`);
     }
-    
-    // Definir para o início do expediente
-    const startTime = parseTime(settings.workingHours.start);
-    currentDate.setHours(startTime.hours, startTime.minutes, 0, 0);
   }
   
-  return currentDate;
+  console.log(`   ✅ Trabalho finalizado: ${currentTime.toLocaleString('pt-BR')}`);
+  return currentTime;
 }
 
 /**
