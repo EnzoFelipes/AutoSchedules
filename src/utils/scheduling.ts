@@ -128,6 +128,142 @@ export function calculateServiceDuration(serviceIds: string[], vehicleSize: stri
   };
 }
 
+/**
+ * Calcula quando o trabalho ativo terminará, considerando horários de funcionamento
+ */
+export function calculateWorkEndTime(
+  startDateTime: Date,
+  workDurationMinutes: number,
+  settings: BusinessSettings = DEFAULT_BUSINESS_SETTINGS
+): Date {
+  let remainingWork = workDurationMinutes;
+  let currentDate = new Date(startDateTime);
+  
+  while (remainingWork > 0) {
+    const workingPeriods = getWorkingPeriods(currentDate, settings);
+    
+    for (const period of workingPeriods) {
+      if (remainingWork <= 0) break;
+      
+      // Se o trabalho começou neste período
+      if (currentDate >= period.start && currentDate < period.end) {
+        const availableMinutesInPeriod = Math.floor((period.end.getTime() - currentDate.getTime()) / (1000 * 60));
+        const workInThisPeriod = Math.min(remainingWork, availableMinutesInPeriod);
+        
+        if (workInThisPeriod >= remainingWork) {
+          // Trabalho termina neste período
+          return new Date(currentDate.getTime() + remainingWork * 60000);
+        } else {
+          // Trabalho continua no próximo período
+          remainingWork -= workInThisPeriod;
+          currentDate = new Date(period.end);
+        }
+      }
+      // Se ainda não chegamos no período de trabalho
+      else if (currentDate < period.start) {
+        const availableMinutesInPeriod = Math.floor((period.end.getTime() - period.start.getTime()) / (1000 * 60));
+        const workInThisPeriod = Math.min(remainingWork, availableMinutesInPeriod);
+        
+        if (workInThisPeriod >= remainingWork) {
+          // Trabalho termina neste período
+          return new Date(period.start.getTime() + remainingWork * 60000);
+        } else {
+          // Trabalho continua no próximo período
+          remainingWork -= workInThisPeriod;
+          currentDate = new Date(period.end);
+        }
+      }
+    }
+    
+    // Se chegamos aqui, precisamos ir para o próximo dia útil
+    currentDate.setDate(currentDate.getDate() + 1);
+    currentDate.setHours(0, 0, 0, 0);
+    
+    // Encontrar o próximo dia útil
+    while (!isWorkingDay(currentDate, settings)) {
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    // Definir para o início do expediente
+    const startTime = parseTime(settings.workingHours.start);
+    currentDate.setHours(startTime.hours, startTime.minutes, 0, 0);
+  }
+  
+  return currentDate;
+}
+
+/**
+ * Verifica se um serviço pode ser agendado em um horário específico
+ */
+export function canScheduleService(
+  startDateTime: Date,
+  workDurationMinutes: number,
+  dryingDurationMinutes: number,
+  existingAppointments: Appointment[],
+  settings: BusinessSettings = DEFAULT_BUSINESS_SETTINGS
+): {
+  canSchedule: boolean;
+  workEndTime: Date;
+  serviceCompleteTime: Date;
+  conflicts: string[];
+} {
+  const conflicts: string[] = [];
+  
+  // Verificar se o horário de início está dentro do expediente
+  const startDate = new Date(startDateTime);
+  const workingPeriods = getWorkingPeriods(startDate, settings);
+  const isInWorkingHours = workingPeriods.some(period => 
+    startDateTime >= period.start && startDateTime < period.end
+  );
+  
+  if (!isInWorkingHours) {
+    conflicts.push('Horário de início fora do expediente');
+  }
+  
+  // Calcular quando o trabalho ativo terminará
+  const workEndTime = calculateWorkEndTime(startDateTime, workDurationMinutes, settings);
+  
+  // Calcular quando o serviço estará completamente pronto (incluindo secagem)
+  const serviceCompleteTime = new Date(workEndTime.getTime() + dryingDurationMinutes * 60000);
+  
+  // Verificar conflitos com outros agendamentos durante o período de trabalho
+  const workConflicts = existingAppointments.filter(apt => {
+    if (apt.status === 'cancelled') return false;
+    
+    const aptStart = new Date(apt.startDateTime);
+    const aptEnd = new Date(apt.endDateTime);
+    
+    return startDateTime < aptEnd && workEndTime > aptStart;
+  });
+  
+  if (workConflicts.length > 0) {
+    conflicts.push(`Conflito durante execução do trabalho com ${workConflicts.length} agendamento(s)`);
+  }
+  
+  // Verificar conflitos durante o período de secagem (se houver)
+  if (dryingDurationMinutes > 0) {
+    const dryingConflicts = existingAppointments.filter(apt => {
+      if (apt.status === 'cancelled') return false;
+      
+      const aptStart = new Date(apt.startDateTime);
+      const aptDryingEnd = apt.dryingEndDateTime ? new Date(apt.dryingEndDateTime) : new Date(apt.endDateTime);
+      
+      return workEndTime < aptDryingEnd && serviceCompleteTime > aptStart;
+    });
+    
+    if (dryingConflicts.length > 0) {
+      conflicts.push(`Conflito durante secagem com ${dryingConflicts.length} agendamento(s)`);
+    }
+  }
+  
+  return {
+    canSchedule: conflicts.length === 0,
+    workEndTime,
+    serviceCompleteTime,
+    conflicts,
+  };
+}
+
 export function findAvailableSlots(
   startDate: Date,
   endDate: Date,
@@ -167,18 +303,12 @@ export function findDaySlotsForService(
   const slots: AvailabilitySlot[] = [];
   const workingPeriods = getWorkingPeriods(date, settings);
   
-  // Filtrar agendamentos do dia
-  const dayAppointments = appointments.filter(apt => {
-    const aptDate = new Date(apt.startDateTime);
-    return aptDate.toDateString() === date.toDateString() && apt.status !== 'cancelled';
-  });
-  
   workingPeriods.forEach(period => {
     const periodSlots = findPeriodSlots(
       period,
       requiredWorkMinutes,
       dryingMinutes,
-      dayAppointments,
+      appointments,
       settings
     );
     slots.push(...periodSlots);
@@ -200,38 +330,22 @@ export function findPeriodSlots(
   let currentTime = new Date(period.start);
   
   while (currentTime < period.end) {
-    const slotEnd = new Date(currentTime.getTime() + requiredWorkMinutes * 60000);
+    const scheduleCheck = canScheduleService(
+      currentTime,
+      requiredWorkMinutes,
+      dryingMinutes,
+      appointments,
+      settings
+    );
     
-    // Verificar se o slot de trabalho cabe no período
-    if (slotEnd <= period.end) {
-      // Verificar conflitos com agendamentos existentes
-      const hasConflict = appointments.some(apt => {
-        const aptStart = new Date(apt.startDateTime);
-        const aptEnd = new Date(apt.endDateTime);
-        return currentTime < aptEnd && slotEnd > aptStart;
+    if (scheduleCheck.canSchedule) {
+      slots.push({
+        date: currentTime.toISOString().split('T')[0],
+        startTime: currentTime.toTimeString().slice(0, 5),
+        endTime: scheduleCheck.workEndTime.toTimeString().slice(0, 5),
+        availableDuration: requiredWorkMinutes,
+        canStartService: true,
       });
-      
-      if (!hasConflict) {
-        // Calcular quando o serviço estará completamente pronto (incluindo secagem)
-        const serviceCompleteTime = new Date(slotEnd.getTime() + dryingMinutes * 60000);
-        
-        // Verificar se há conflito durante o período de secagem
-        const dryingConflict = dryingMinutes > 0 && appointments.some(apt => {
-          const aptStart = new Date(apt.startDateTime);
-          const aptEnd = new Date(apt.dryingEndDateTime || apt.endDateTime);
-          return slotEnd < aptEnd && serviceCompleteTime > aptStart;
-        });
-        
-        if (!dryingConflict) {
-          slots.push({
-            date: currentTime.toISOString().split('T')[0],
-            startTime: currentTime.toTimeString().slice(0, 5),
-            endTime: slotEnd.toTimeString().slice(0, 5),
-            availableDuration: requiredWorkMinutes,
-            canStartService: true,
-          });
-        }
-      }
     }
     
     currentTime.setMinutes(currentTime.getMinutes() + slotInterval);

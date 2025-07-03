@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, AlertCircle, CheckCircle, Info } from 'lucide-react';
+import { Calendar, Clock, AlertCircle, CheckCircle, Info, AlertTriangle } from 'lucide-react';
 import { Vehicle, Service, Appointment, AvailabilitySlot } from '../../types';
 import { 
   findAvailableSlots, 
   calculateServiceDuration, 
   formatDuration, 
-  DEFAULT_BUSINESS_SETTINGS 
+  DEFAULT_BUSINESS_SETTINGS,
+  calculateWorkEndTime,
+  canScheduleService
 } from '../../utils/scheduling';
 
 interface AvailabilityCheckerProps {
@@ -88,18 +90,32 @@ export function AvailabilityChecker({
     }
   };
 
-  const getServiceCompletionTime = (slot: AvailabilitySlot) => {
-    if (!serviceDuration) return '';
+  const getServiceCompletionDetails = (slot: AvailabilitySlot) => {
+    if (!serviceDuration) return null;
     
     const startTime = new Date(`${slot.date}T${slot.startTime}:00`);
-    const workEndTime = new Date(startTime.getTime() + serviceDuration.workDuration * 60000);
+    const workEndTime = calculateWorkEndTime(startTime, serviceDuration.workDuration, DEFAULT_BUSINESS_SETTINGS);
     const completionTime = new Date(workEndTime.getTime() + serviceDuration.dryingDuration * 60000);
+    
+    const workEndDate = workEndTime.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    const completionDate = completionTime.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    const slotDate = new Date(slot.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
     
     return {
       workEnd: workEndTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      workEndDate,
       completion: completionTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-      completionDate: completionTime.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+      completionDate,
+      workSpansMultipleDays: workEndDate !== slotDate,
+      completionSpansMultipleDays: completionDate !== workEndDate,
     };
+  };
+
+  const getWorkingHoursInfo = () => {
+    const settings = DEFAULT_BUSINESS_SETTINGS;
+    return `${settings.workingHours.start} - ${settings.workingHours.end}${
+      settings.workingHours.lunchStart ? ` (pausa: ${settings.workingHours.lunchStart} - ${settings.workingHours.lunchEnd})` : ''
+    }`;
   };
 
   if (!selectedVehicle || selectedServices.length === 0) {
@@ -124,16 +140,40 @@ export function AvailabilityChecker({
             <div>
               <span className="text-blue-700">Tempo de Trabalho:</span>
               <p className="font-medium text-blue-900">{formatDuration(serviceDuration.workDuration)}</p>
+              <p className="text-xs text-blue-600">Durante horário comercial</p>
             </div>
             {serviceDuration.dryingDuration > 0 && (
               <div>
                 <span className="text-blue-700">Tempo de Secagem:</span>
                 <p className="font-medium text-blue-900">{formatDuration(serviceDuration.dryingDuration)}</p>
+                <p className="text-xs text-blue-600">Pode ser durante a madrugada</p>
               </div>
             )}
             <div>
-              <span className="text-blue-700">Tempo Total:</span>
-              <p className="font-medium text-blue-900">{formatDuration(serviceDuration.totalDuration)}</p>
+              <span className="text-blue-700">Horário de Trabalho:</span>
+              <p className="font-medium text-blue-900">{getWorkingHoursInfo()}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Explicação do Sistema */}
+      {serviceDuration && serviceDuration.workDuration > 480 && ( // Mais de 8 horas
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <div className="flex items-start space-x-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+            <div>
+              <h4 className="font-medium text-amber-900 mb-1">
+                Serviço de Longa Duração
+              </h4>
+              <p className="text-sm text-amber-800 mb-2">
+                Este serviço requer mais de um dia de trabalho. O sistema automaticamente distribui o trabalho pelos dias úteis disponíveis.
+              </p>
+              <div className="text-xs text-amber-700">
+                <p>• Trabalho ativo: apenas durante horário comercial</p>
+                <p>• Secagem: pode continuar durante a madrugada</p>
+                <p>• Agendamento: considera feriados e fins de semana</p>
+              </div>
             </div>
           </div>
         </div>
@@ -156,7 +196,7 @@ export function AvailabilityChecker({
           </h4>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {availableSlots.map((slot, index) => {
-              const completion = getServiceCompletionTime(slot);
+              const details = getServiceCompletionDetails(slot);
               
               return (
                 <button
@@ -164,7 +204,7 @@ export function AvailabilityChecker({
                   onClick={() => onSlotSelect?.(slot)}
                   className="w-full text-left p-3 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors"
                 >
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center space-x-2">
                       <Calendar className="w-4 h-4 text-gray-500" />
                       <span className="font-medium text-gray-900">
@@ -172,16 +212,35 @@ export function AvailabilityChecker({
                       </span>
                     </div>
                     <span className="text-sm text-gray-600">
-                      {slot.startTime} - {slot.endTime}
+                      Início: {slot.startTime}
                     </span>
                   </div>
                   
-                  {serviceDuration && serviceDuration.dryingDuration > 0 && (
+                  {details && (
                     <div className="text-xs text-gray-500 space-y-1">
-                      <div>Trabalho finaliza às {completion.workEnd}</div>
-                      <div>Pronto para entrega: {completion.completion} 
-                        {completion.completionDate !== slot.date && ` (${completion.completionDate})`}
+                      <div className="flex items-center justify-between">
+                        <span>Trabalho finaliza:</span>
+                        <span className="font-medium">
+                          {details.workEnd}
+                          {details.workSpansMultipleDays && ` (${details.workEndDate})`}
+                        </span>
                       </div>
+                      
+                      {serviceDuration && serviceDuration.dryingDuration > 0 && (
+                        <div className="flex items-center justify-between text-orange-600">
+                          <span>Pronto para entrega:</span>
+                          <span className="font-medium">
+                            {details.completion}
+                            {details.completionSpansMultipleDays && ` (${details.completionDate})`}
+                          </span>
+                        </div>
+                      )}
+                      
+                      {details.workSpansMultipleDays && (
+                        <div className="text-blue-600 text-xs mt-1">
+                          ⚠️ Trabalho distribuído em múltiplos dias
+                        </div>
+                      )}
                     </div>
                   )}
                 </button>
@@ -204,11 +263,13 @@ export function AvailabilityChecker({
                 Não há horários disponíveis nas próximas 2 semanas para este serviço.
               </p>
               <div className="text-xs text-yellow-700">
-                <p>• Duração necessária: {formatDuration(serviceDuration.workDuration)}</p>
+                <p>• Duração do trabalho: {formatDuration(serviceDuration.workDuration)}</p>
                 {serviceDuration.dryingDuration > 0 && (
                   <p>• Tempo de secagem: {formatDuration(serviceDuration.dryingDuration)}</p>
                 )}
-                <p>• Horário de funcionamento: 08:00 - 18:00 (pausa: 12:00 - 13:00)</p>
+                <p>• Horário de funcionamento: {getWorkingHoursInfo()}</p>
+                <p>• Trabalho ativo apenas durante expediente</p>
+                <p>• Secagem pode continuar 24h</p>
               </div>
             </div>
           </div>

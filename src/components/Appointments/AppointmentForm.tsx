@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Clock, User, Car, Wrench, FileText, DollarSign, CheckCircle } from 'lucide-react';
+import { X, Calendar, Clock, User, Car, Wrench, FileText, DollarSign, CheckCircle, AlertTriangle } from 'lucide-react';
 import { Appointment, Client, Vehicle, Service, AvailabilitySlot } from '../../types';
-import { formatCurrency, calculateServiceDuration } from '../../utils/scheduling';
+import { formatCurrency, calculateServiceDuration, calculateWorkEndTime, DEFAULT_BUSINESS_SETTINGS } from '../../utils/scheduling';
 import { AvailabilityChecker } from './AvailabilityChecker';
 
 interface AppointmentFormProps {
@@ -43,6 +43,11 @@ export function AppointmentForm({
   const [dryingDuration, setDryingDuration] = useState(0);
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(null);
   const [showAvailability, setShowAvailability] = useState(false);
+  const [schedulingDetails, setSchedulingDetails] = useState<{
+    workEndTime: Date;
+    serviceCompleteTime: Date;
+    spansMultipleDays: boolean;
+  } | null>(null);
 
   // Filter vehicles when client changes
   useEffect(() => {
@@ -121,7 +126,29 @@ export function AppointmentForm({
   useEffect(() => {
     setShowAvailability(formData.vehicleId !== '' && formData.serviceIds.length > 0);
     setSelectedSlot(null);
+    setSchedulingDetails(null);
   }, [formData.vehicleId, formData.serviceIds]);
+
+  // Calculate scheduling details when start time changes
+  useEffect(() => {
+    if (formData.startDateTime && totalDuration > 0) {
+      const startTime = new Date(formData.startDateTime);
+      const workEndTime = calculateWorkEndTime(startTime, totalDuration, DEFAULT_BUSINESS_SETTINGS);
+      const serviceCompleteTime = new Date(workEndTime.getTime() + dryingDuration * 60000);
+      
+      const startDate = startTime.toDateString();
+      const workEndDate = workEndTime.toDateString();
+      const completeDate = serviceCompleteTime.toDateString();
+      
+      setSchedulingDetails({
+        workEndTime,
+        serviceCompleteTime,
+        spansMultipleDays: startDate !== workEndDate || workEndDate !== completeDate,
+      });
+    } else {
+      setSchedulingDetails(null);
+    }
+  }, [formData.startDateTime, totalDuration, dryingDuration]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -155,13 +182,13 @@ export function AppointmentForm({
 
       if (selectedSlot) {
         startDate = new Date(`${selectedSlot.date}T${selectedSlot.startTime}:00`);
-        endDate = new Date(startDate.getTime() + totalDuration * 60000);
+        endDate = calculateWorkEndTime(startDate, totalDuration, DEFAULT_BUSINESS_SETTINGS);
         if (dryingDuration > 0) {
           dryingEndDate = new Date(endDate.getTime() + dryingDuration * 60000);
         }
       } else {
         startDate = new Date(formData.startDateTime);
-        endDate = new Date(startDate.getTime() + totalDuration * 60000);
+        endDate = calculateWorkEndTime(startDate, totalDuration, DEFAULT_BUSINESS_SETTINGS);
         if (dryingDuration > 0) {
           dryingEndDate = new Date(endDate.getTime() + dryingDuration * 60000);
         }
@@ -348,6 +375,48 @@ export function AppointmentForm({
                     }`}
                   />
                   {errors.startDateTime && <p className="text-red-500 text-sm mt-1">{errors.startDateTime}</p>}
+                </div>
+              )}
+
+              {/* Detalhes do Agendamento */}
+              {schedulingDetails && (
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <h4 className="font-medium text-blue-900 mb-2 flex items-center">
+                    <Clock className="w-4 h-4 mr-2" />
+                    Cronograma do Serviço
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-blue-700">Trabalho finaliza:</span>
+                      <span className="font-medium text-blue-900">
+                        {schedulingDetails.workEndTime.toLocaleString('pt-BR', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                    </div>
+                    {dryingDuration > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-blue-700">Pronto para entrega:</span>
+                        <span className="font-medium text-blue-900">
+                          {schedulingDetails.serviceCompleteTime.toLocaleString('pt-BR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                    )}
+                    {schedulingDetails.spansMultipleDays && (
+                      <div className="flex items-center space-x-2 text-amber-700 mt-2">
+                        <AlertTriangle className="w-4 h-4" />
+                        <span className="text-xs">Serviço distribuído em múltiplos dias</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
