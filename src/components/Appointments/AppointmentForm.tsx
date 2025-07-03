@@ -49,6 +49,19 @@ export function AppointmentForm({
     spansMultipleDays: boolean;
   } | null>(null);
 
+  // Get minimum date (today)
+  const getMinDateTime = () => {
+    const now = new Date();
+    return now.toISOString().slice(0, 16);
+  };
+
+  // Get maximum date (30 days from now)
+  const getMaxDateTime = () => {
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + 30);
+    return maxDate.toISOString().slice(0, 16);
+  };
+
   // Filter vehicles when client changes
   useEffect(() => {
     if (formData.clientId) {
@@ -133,6 +146,14 @@ export function AppointmentForm({
   useEffect(() => {
     if (formData.startDateTime && totalDuration > 0) {
       const startTime = new Date(formData.startDateTime);
+      
+      // Validate if date is not in the past
+      const now = new Date();
+      if (startTime < now) {
+        setSchedulingDetails(null);
+        return;
+      }
+      
       const workEndTime = calculateWorkEndTime(startTime, totalDuration, DEFAULT_BUSINESS_SETTINGS);
       const serviceCompleteTime = new Date(workEndTime.getTime() + dryingDuration * 60000);
       
@@ -167,6 +188,27 @@ export function AppointmentForm({
 
     if (!formData.startDateTime && !selectedSlot) {
       newErrors.startDateTime = 'Data e hora são obrigatórias';
+    }
+
+    // Validate date is not in the past
+    if (formData.startDateTime && !selectedSlot) {
+      const selectedDate = new Date(formData.startDateTime);
+      const now = new Date();
+      
+      if (selectedDate < now) {
+        newErrors.startDateTime = 'Não é possível agendar para uma data passada';
+      }
+    }
+
+    // Validate date is within allowed range (30 days)
+    if (formData.startDateTime && !selectedSlot) {
+      const selectedDate = new Date(formData.startDateTime);
+      const maxDate = new Date();
+      maxDate.setDate(maxDate.getDate() + 30);
+      
+      if (selectedDate > maxDate) {
+        newErrors.startDateTime = 'Agendamento máximo de 30 dias antecipados';
+      }
     }
 
     setErrors(newErrors);
@@ -242,6 +284,34 @@ export function AppointmentForm({
   };
 
   const selectedVehicle = vehicles.find(v => v.id === formData.vehicleId);
+
+  const isPastDate = (dateString: string) => {
+    if (!dateString) return false;
+    const selectedDate = new Date(dateString);
+    const now = new Date();
+    return selectedDate < now;
+  };
+
+  const formatDateForDisplay = (dateString: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    if (date.toDateString() === today.toDateString()) {
+      return 'Hoje';
+    } else if (date.toDateString() === tomorrow.toDateString()) {
+      return 'Amanhã';
+    } else {
+      return date.toLocaleDateString('pt-BR', { 
+        weekday: 'long', 
+        day: '2-digit', 
+        month: '2-digit',
+        year: 'numeric'
+      });
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -370,16 +440,42 @@ export function AppointmentForm({
                     type="datetime-local"
                     value={formData.startDateTime}
                     onChange={(e) => setFormData(prev => ({ ...prev, startDateTime: e.target.value }))}
+                    min={getMinDateTime()}
+                    max={getMaxDateTime()}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                       errors.startDateTime ? 'border-red-300' : 'border-gray-300'
                     }`}
                   />
                   {errors.startDateTime && <p className="text-red-500 text-sm mt-1">{errors.startDateTime}</p>}
+                  
+                  {/* Date Helper Info */}
+                  <div className="mt-2 text-xs text-gray-500">
+                    <div className="flex items-center space-x-4">
+                      <span>📅 Hoje: {new Date().toLocaleDateString('pt-BR')}</span>
+                      <span>⏰ Horário: 08:00 - 18:00</span>
+                      <span>📆 Máximo: 30 dias</span>
+                    </div>
+                  </div>
+                  
+                  {formData.startDateTime && (
+                    <div className="mt-2 p-2 bg-blue-50 rounded text-sm">
+                      <span className="text-blue-700">
+                        Agendamento para: <strong>{formatDateForDisplay(formData.startDateTime)}</strong>
+                      </span>
+                    </div>
+                  )}
+                  
+                  {isPastDate(formData.startDateTime) && (
+                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700 flex items-center space-x-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      <span>Data selecionada está no passado. Escolha uma data futura.</span>
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* Detalhes do Agendamento */}
-              {schedulingDetails && (
+              {schedulingDetails && !isPastDate(formData.startDateTime) && (
                 <div className="bg-blue-50 rounded-lg p-4">
                   <h4 className="font-medium text-blue-900 mb-2 flex items-center">
                     <Clock className="w-4 h-4 mr-2" />
@@ -467,11 +563,7 @@ export function AppointmentForm({
                         <span className="font-medium">Horário Selecionado</span>
                       </div>
                       <p className="text-sm text-green-700 mt-1">
-                        {new Date(selectedSlot.date).toLocaleDateString('pt-BR', { 
-                          weekday: 'long', 
-                          day: '2-digit', 
-                          month: '2-digit' 
-                        })} às {selectedSlot.startTime}
+                        {formatDateForDisplay(`${selectedSlot.date}T${selectedSlot.startTime}:00`)} às {selectedSlot.startTime}
                       </p>
                     </div>
                   )}

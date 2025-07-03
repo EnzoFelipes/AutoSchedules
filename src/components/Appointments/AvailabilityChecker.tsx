@@ -50,7 +50,11 @@ export function AvailabilityChecker({
       const duration = calculateServiceDuration(serviceIds, selectedVehicle.size, selectedServices);
       setServiceDuration(duration);
 
+      // Start from tomorrow to avoid past dates
       const startDate = new Date();
+      startDate.setDate(startDate.getDate() + 1);
+      startDate.setHours(0, 0, 0, 0);
+      
       const endDate = new Date();
       endDate.setDate(endDate.getDate() + 14); // Próximas 2 semanas
 
@@ -118,6 +122,15 @@ export function AvailabilityChecker({
     }`;
   };
 
+  const getTodayDate = () => {
+    return new Date().toLocaleDateString('pt-BR', {
+      weekday: 'long',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  };
+
   if (!selectedVehicle || selectedServices.length === 0) {
     return (
       <div className="bg-gray-50 rounded-lg p-6 text-center">
@@ -129,6 +142,17 @@ export function AvailabilityChecker({
 
   return (
     <div className="space-y-4">
+      {/* Data Atual */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+        <div className="flex items-center space-x-2 text-blue-800">
+          <Calendar className="w-4 h-4" />
+          <span className="text-sm font-medium">Hoje: {getTodayDate()}</span>
+        </div>
+        <p className="text-xs text-blue-600 mt-1">
+          ⚠️ Agendamentos só podem ser feitos para datas futuras
+        </p>
+      </div>
+
       {/* Resumo do Serviço */}
       {serviceDuration && (
         <div className="bg-blue-50 rounded-lg p-4">
@@ -173,6 +197,7 @@ export function AvailabilityChecker({
                 <p>• Trabalho ativo: apenas durante horário comercial</p>
                 <p>• Secagem: pode continuar durante a madrugada</p>
                 <p>• Agendamento: considera feriados e fins de semana</p>
+                <p>• Datas passadas: não permitidas</p>
               </div>
             </div>
           </div>
@@ -192,23 +217,31 @@ export function AvailabilityChecker({
         <div>
           <h4 className="font-medium text-gray-900 mb-3 flex items-center">
             <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
-            Horários Disponíveis
+            Horários Disponíveis (Próximos Dias)
           </h4>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {availableSlots.map((slot, index) => {
               const details = getServiceCompletionDetails(slot);
+              const slotDate = new Date(slot.date);
+              const isToday = slotDate.toDateString() === new Date().toDateString();
               
               return (
                 <button
                   key={index}
                   onClick={() => onSlotSelect?.(slot)}
-                  className="w-full text-left p-3 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                  disabled={isToday}
+                  className={`w-full text-left p-3 border rounded-lg transition-colors ${
+                    isToday 
+                      ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-50' 
+                      : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                  }`}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center space-x-2">
                       <Calendar className="w-4 h-4 text-gray-500" />
                       <span className="font-medium text-gray-900">
                         {formatSlotDate(slot.date)}
+                        {isToday && <span className="text-red-500 ml-2">(Não disponível)</span>}
                       </span>
                     </div>
                     <span className="text-sm text-gray-600">
@@ -216,7 +249,7 @@ export function AvailabilityChecker({
                     </span>
                   </div>
                   
-                  {details && (
+                  {details && !isToday && (
                     <div className="text-xs text-gray-500 space-y-1">
                       <div className="flex items-center justify-between">
                         <span>Trabalho finaliza:</span>
@@ -241,6 +274,12 @@ export function AvailabilityChecker({
                           ⚠️ Trabalho distribuído em múltiplos dias
                         </div>
                       )}
+                    </div>
+                  )}
+                  
+                  {isToday && (
+                    <div className="text-xs text-red-500 mt-1">
+                      Agendamentos para hoje não são permitidos
                     </div>
                   )}
                 </button>
@@ -270,6 +309,7 @@ export function AvailabilityChecker({
                 <p>• Horário de funcionamento: {getWorkingHoursInfo()}</p>
                 <p>• Trabalho ativo apenas durante expediente</p>
                 <p>• Secagem pode continuar 24h</p>
+                <p>• Agendamentos apenas para datas futuras</p>
               </div>
             </div>
           </div>
