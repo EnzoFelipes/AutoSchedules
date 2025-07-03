@@ -147,13 +147,6 @@ export function AppointmentForm({
     if (formData.startDateTime && totalDuration > 0) {
       const startTime = new Date(formData.startDateTime);
       
-      // Validate if date is not in the past
-      const now = new Date();
-      if (startTime < now) {
-        setSchedulingDetails(null);
-        return;
-      }
-      
       const workEndTime = calculateWorkEndTime(startTime, totalDuration, DEFAULT_BUSINESS_SETTINGS);
       const serviceCompleteTime = new Date(workEndTime.getTime() + dryingDuration * 60000);
       
@@ -188,16 +181,6 @@ export function AppointmentForm({
 
     if (!formData.startDateTime && !selectedSlot) {
       newErrors.startDateTime = 'Data e hora são obrigatórias';
-    }
-
-    // Validate date is not in the past
-    if (formData.startDateTime && !selectedSlot) {
-      const selectedDate = new Date(formData.startDateTime);
-      const now = new Date();
-      
-      if (selectedDate < now) {
-        newErrors.startDateTime = 'Não é possível agendar para uma data passada';
-      }
     }
 
     // Validate date is within allowed range (30 days)
@@ -283,15 +266,6 @@ export function AppointmentForm({
     return config ? { service, config } : null;
   };
 
-  const selectedVehicle = vehicles.find(v => v.id === formData.vehicleId);
-
-  const isPastDate = (dateString: string) => {
-    if (!dateString) return false;
-    const selectedDate = new Date(dateString);
-    const now = new Date();
-    return selectedDate < now;
-  };
-
   const formatDateForDisplay = (dateString: string) => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -312,6 +286,8 @@ export function AppointmentForm({
       });
     }
   };
+
+  const selectedVehicle = vehicles.find(v => v.id === formData.vehicleId);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -464,18 +440,11 @@ export function AppointmentForm({
                       </span>
                     </div>
                   )}
-                  
-                  {isPastDate(formData.startDateTime) && (
-                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700 flex items-center space-x-2">
-                      <AlertTriangle className="w-4 h-4" />
-                      <span>Data selecionada está no passado. Escolha uma data futura.</span>
-                    </div>
-                  )}
                 </div>
               )}
 
               {/* Detalhes do Agendamento */}
-              {schedulingDetails && !isPastDate(formData.startDateTime) && (
+              {schedulingDetails && (
                 <div className="bg-blue-50 rounded-lg p-4">
                   <h4 className="font-medium text-blue-900 mb-2 flex items-center">
                     <Clock className="w-4 h-4 mr-2" />
@@ -509,7 +478,7 @@ export function AppointmentForm({
                     {schedulingDetails.spansMultipleDays && (
                       <div className="flex items-center space-x-2 text-amber-700 mt-2">
                         <AlertTriangle className="w-4 h-4" />
-                        <span className="text-xs">Serviço distribuído em múltiplos dias</span>
+                        <span className="text-xs">Trabalho distribuído em múltiplos dias</span>
                       </div>
                     )}
                   </div>

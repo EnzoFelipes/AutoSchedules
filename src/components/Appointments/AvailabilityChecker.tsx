@@ -50,13 +50,10 @@ export function AvailabilityChecker({
       const duration = calculateServiceDuration(serviceIds, selectedVehicle.size, selectedServices);
       setServiceDuration(duration);
 
-      // Start from tomorrow to avoid past dates
+      // Start from today (allow today's appointments if time permits)
       const startDate = new Date();
-      startDate.setDate(startDate.getDate() + 1);
-      startDate.setHours(0, 0, 0, 0);
-      
       const endDate = new Date();
-      endDate.setDate(endDate.getDate() + 14); // Próximas 2 semanas
+      endDate.setDate(endDate.getDate() + 30); // Próximas 4 semanas (mais opções)
 
       const slots = findAvailableSlots(
         startDate,
@@ -67,7 +64,8 @@ export function AvailabilityChecker({
         DEFAULT_BUSINESS_SETTINGS
       );
 
-      setAvailableSlots(slots.slice(0, 10)); // Mostrar apenas os primeiros 10 slots
+      // Show more slots (up to 20 instead of 10)
+      setAvailableSlots(slots.slice(0, 20));
     } catch (error) {
       console.error('Erro ao verificar disponibilidade:', error);
     } finally {
@@ -131,6 +129,27 @@ export function AvailabilityChecker({
     });
   };
 
+  const getCurrentTime = () => {
+    return new Date().toLocaleTimeString('pt-BR', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const groupSlotsByDate = (slots: AvailabilitySlot[]) => {
+    const grouped: Record<string, AvailabilitySlot[]> = {};
+    
+    slots.forEach(slot => {
+      const dateKey = slot.date;
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = [];
+      }
+      grouped[dateKey].push(slot);
+    });
+    
+    return grouped;
+  };
+
   if (!selectedVehicle || selectedServices.length === 0) {
     return (
       <div className="bg-gray-50 rounded-lg p-6 text-center">
@@ -140,16 +159,25 @@ export function AvailabilityChecker({
     );
   }
 
+  const groupedSlots = groupSlotsByDate(availableSlots);
+  const todaySlots = groupedSlots[new Date().toISOString().split('T')[0]] || [];
+
   return (
     <div className="space-y-4">
-      {/* Data Atual */}
+      {/* Data e Hora Atual */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-        <div className="flex items-center space-x-2 text-blue-800">
-          <Calendar className="w-4 h-4" />
-          <span className="text-sm font-medium">Hoje: {getTodayDate()}</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2 text-blue-800">
+            <Calendar className="w-4 h-4" />
+            <span className="text-sm font-medium">Hoje: {getTodayDate()}</span>
+          </div>
+          <div className="text-blue-700 text-sm">
+            <Clock className="w-4 h-4 inline mr-1" />
+            {getCurrentTime()}
+          </div>
         </div>
         <p className="text-xs text-blue-600 mt-1">
-          ⚠️ Agendamentos só podem ser feitos para datas futuras
+          ✅ Agendamentos para hoje são permitidos se houver tempo disponível
         </p>
       </div>
 
@@ -181,6 +209,39 @@ export function AvailabilityChecker({
         </div>
       )}
 
+      {/* Horários de Hoje (se disponíveis) */}
+      {todaySlots.length > 0 && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <h4 className="font-medium text-green-900 mb-3 flex items-center">
+            <CheckCircle className="w-4 h-4 mr-2" />
+            Disponível Hoje ({todaySlots.length} horário{todaySlots.length !== 1 ? 's' : ''})
+          </h4>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+            {todaySlots.map((slot, index) => {
+              const details = getServiceCompletionDetails(slot);
+              
+              return (
+                <button
+                  key={index}
+                  onClick={() => onSlotSelect?.(slot)}
+                  className="p-2 border border-green-300 rounded-lg hover:bg-green-100 transition-colors text-left"
+                >
+                  <div className="font-medium text-green-900 text-sm">
+                    {slot.startTime}
+                  </div>
+                  {details && (
+                    <div className="text-xs text-green-700 mt-1">
+                      Termina: {details.workEnd}
+                      {details.workSpansMultipleDays && ' (amanhã)'}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Explicação do Sistema */}
       {serviceDuration && serviceDuration.workDuration > 480 && ( // Mais de 8 horas
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
@@ -197,7 +258,7 @@ export function AvailabilityChecker({
                 <p>• Trabalho ativo: apenas durante horário comercial</p>
                 <p>• Secagem: pode continuar durante a madrugada</p>
                 <p>• Agendamento: considera feriados e fins de semana</p>
-                <p>• Datas passadas: não permitidas</p>
+                <p>• Hoje: permitido se houver tempo suficiente</p>
               </div>
             </div>
           </div>
@@ -212,77 +273,69 @@ export function AvailabilityChecker({
         </div>
       )}
 
-      {/* Slots Disponíveis */}
+      {/* Todos os Slots Disponíveis */}
       {!loading && availableSlots.length > 0 && (
         <div>
-          <h4 className="font-medium text-gray-900 mb-3 flex items-center">
-            <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
-            Horários Disponíveis (Próximos Dias)
+          <h4 className="font-medium text-gray-900 mb-3 flex items-center justify-between">
+            <span className="flex items-center">
+              <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
+              Todos os Horários Disponíveis
+            </span>
+            <span className="text-sm text-gray-500">
+              {availableSlots.length} opções (próximos 30 dias)
+            </span>
           </h4>
-          <div className="space-y-2 max-h-64 overflow-y-auto">
-            {availableSlots.map((slot, index) => {
-              const details = getServiceCompletionDetails(slot);
-              const slotDate = new Date(slot.date);
-              const isToday = slotDate.toDateString() === new Date().toDateString();
+          
+          <div className="space-y-4 max-h-96 overflow-y-auto">
+            {Object.entries(groupedSlots).map(([date, slots]) => {
+              const isToday = date === new Date().toISOString().split('T')[0];
+              
+              if (isToday && todaySlots.length > 0) {
+                return null; // Já mostrado acima
+              }
               
               return (
-                <button
-                  key={index}
-                  onClick={() => onSlotSelect?.(slot)}
-                  disabled={isToday}
-                  className={`w-full text-left p-3 border rounded-lg transition-colors ${
-                    isToday 
-                      ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-50' 
-                      : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center space-x-2">
-                      <Calendar className="w-4 h-4 text-gray-500" />
-                      <span className="font-medium text-gray-900">
-                        {formatSlotDate(slot.date)}
-                        {isToday && <span className="text-red-500 ml-2">(Não disponível)</span>}
-                      </span>
-                    </div>
-                    <span className="text-sm text-gray-600">
-                      Início: {slot.startTime}
+                <div key={date} className="border border-gray-200 rounded-lg p-3">
+                  <h5 className="font-medium text-gray-900 mb-2 flex items-center">
+                    <Calendar className="w-4 h-4 mr-2" />
+                    {formatSlotDate(date)} - {new Date(date).toLocaleDateString('pt-BR')}
+                    <span className="ml-2 text-sm text-gray-500">
+                      ({slots.length} horário{slots.length !== 1 ? 's' : ''})
                     </span>
+                  </h5>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {slots.map((slot, index) => {
+                      const details = getServiceCompletionDetails(slot);
+                      
+                      return (
+                        <button
+                          key={index}
+                          onClick={() => onSlotSelect?.(slot)}
+                          className="p-2 border border-gray-200 rounded hover:border-blue-300 hover:bg-blue-50 transition-colors text-left"
+                        >
+                          <div className="font-medium text-gray-900 text-sm">
+                            {slot.startTime}
+                          </div>
+                          {details && (
+                            <div className="text-xs text-gray-600 mt-1">
+                              <div>Termina: {details.workEnd}</div>
+                              {details.workSpansMultipleDays && (
+                                <div className="text-blue-600">📅 Múltiplos dias</div>
+                              )}
+                              {serviceDuration && serviceDuration.dryingDuration > 0 && (
+                                <div className="text-orange-600">
+                                  Pronto: {details.completion}
+                                  {details.completionSpansMultipleDays && ` (${details.completionDate})`}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
-                  
-                  {details && !isToday && (
-                    <div className="text-xs text-gray-500 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span>Trabalho finaliza:</span>
-                        <span className="font-medium">
-                          {details.workEnd}
-                          {details.workSpansMultipleDays && ` (${details.workEndDate})`}
-                        </span>
-                      </div>
-                      
-                      {serviceDuration && serviceDuration.dryingDuration > 0 && (
-                        <div className="flex items-center justify-between text-orange-600">
-                          <span>Pronto para entrega:</span>
-                          <span className="font-medium">
-                            {details.completion}
-                            {details.completionSpansMultipleDays && ` (${details.completionDate})`}
-                          </span>
-                        </div>
-                      )}
-                      
-                      {details.workSpansMultipleDays && (
-                        <div className="text-blue-600 text-xs mt-1">
-                          ⚠️ Trabalho distribuído em múltiplos dias
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {isToday && (
-                    <div className="text-xs text-red-500 mt-1">
-                      Agendamentos para hoje não são permitidos
-                    </div>
-                  )}
-                </button>
+                </div>
               );
             })}
           </div>
@@ -299,7 +352,7 @@ export function AvailabilityChecker({
                 Nenhum horário disponível
               </h4>
               <p className="text-sm text-yellow-800 mb-2">
-                Não há horários disponíveis nas próximas 2 semanas para este serviço.
+                Não há horários disponíveis nos próximos 30 dias para este serviço.
               </p>
               <div className="text-xs text-yellow-700">
                 <p>• Duração do trabalho: {formatDuration(serviceDuration.workDuration)}</p>
@@ -309,7 +362,7 @@ export function AvailabilityChecker({
                 <p>• Horário de funcionamento: {getWorkingHoursInfo()}</p>
                 <p>• Trabalho ativo apenas durante expediente</p>
                 <p>• Secagem pode continuar 24h</p>
-                <p>• Agendamentos apenas para datas futuras</p>
+                <p>• Incluindo agendamentos para hoje</p>
               </div>
             </div>
           </div>

@@ -328,6 +328,20 @@ export function findPeriodSlots(
   const slotInterval = 30; // Verificar a cada 30 minutos
   
   let currentTime = new Date(period.start);
+  const now = new Date();
+  
+  // Se for hoje, começar do horário atual (arredondado para próximos 30 min)
+  if (currentTime.toDateString() === now.toDateString()) {
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const nextSlotMinutes = Math.ceil(currentMinutes / slotInterval) * slotInterval;
+    
+    const nextSlotTime = new Date(now);
+    nextSlotTime.setHours(Math.floor(nextSlotMinutes / 60), nextSlotMinutes % 60, 0, 0);
+    
+    if (nextSlotTime > currentTime && nextSlotTime < period.end) {
+      currentTime = nextSlotTime;
+    }
+  }
   
   while (currentTime < period.end) {
     const scheduleCheck = canScheduleService(
